@@ -34,9 +34,7 @@ from datetime import datetime
 from dataclasses import dataclass, asdict
 from typing import Optional
 
-# ─────────────────────────────────────────────
 # ANSI COLOR HELPERS
-# ─────────────────────────────────────────────
 class Color:
     RESET  = "\033[0m"
     BOLD   = "\033[1m"
@@ -62,13 +60,11 @@ if NO_COLOR:
         if not attr.startswith("_"):
             setattr(Color, attr, "")
 
-# ─────────────────────────────────────────────
 # MAGIC NUMBER DATABASE
 # Each entry: (magic_bytes, offset, label, category, extensions)
 # magic_bytes: bytes or list of bytes (multiple signatures for same type)
-# ─────────────────────────────────────────────
+
 SIGNATURES = [
-    # ── Images ──────────────────────────────
     (b"\xFF\xD8\xFF",                 0, "JPEG Image",          "Image",    [".jpg", ".jpeg"]),
     (b"\x89PNG\r\n\x1a\n",           0, "PNG Image",           "Image",    [".png"]),
     (b"GIF87a",                       0, "GIF Image (87a)",     "Image",    [".gif"]),
@@ -79,15 +75,11 @@ SIGNATURES = [
     (b"MM\x00\x2A",                  0, "TIFF Image (BE)",      "Image",    [".tif", ".tiff"]),
     (b"RIFF",                         0, "WebP Image",          "Image",    [".webp"]),   # + WEBP at offset 8
     (b"\x00\x00\x00\x0C\x6A\x50\x20\x20", 0, "JPEG 2000",     "Image",    [".jp2", ".j2k"]),
-
-    # ── Documents ───────────────────────────
     (b"%PDF-",                        0, "PDF Document",        "Document", [".pdf"]),
     (b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1", 0, "MS Office (OLE2)", "Document", [".doc", ".xls", ".ppt"]),
     (b"PK\x03\x04",                  0, "ZIP / Office OpenXML","Archive",  [".zip", ".docx", ".xlsx", ".pptx", ".odt"]),
     (b"{\x5C\rtf",                   0, "RTF Document",        "Document", [".rtf"]),
     (b"\x09\x04\x06\x00\x00\x00\x10\x00", 0, "Excel 97-2003", "Document", [".xls"]),
-
-    # ── Archives ────────────────────────────
     (b"PK\x05\x06",                  0, "ZIP (empty)",         "Archive",  [".zip"]),
     (b"PK\x07\x08",                  0, "ZIP (spanned)",       "Archive",  [".zip"]),
     (b"Rar!\x1a\x07\x00",           0, "RAR Archive v4",      "Archive",  [".rar"]),
@@ -98,8 +90,6 @@ SIGNATURES = [
     (b"7z\xBC\xAF'\x1C",            0, "7-Zip Archive",       "Archive",  [".7z"]),
     (b"ustar",                       257,"TAR Archive",        "Archive",  [".tar"]),
     (b"LZIP",                        0, "LZIP Archive",        "Archive",  [".lz"]),
-
-    # ── Executables & Binaries ───────────────
     (b"MZ",                          0, "Windows Executable",  "Executable",[".exe", ".dll", ".sys"]),
     (b"\x7fELF",                     0, "ELF Binary (Linux)",  "Executable",[".elf", ""]),
     (b"\xCE\xFA\xED\xFE",           0, "Mach-O Binary (32-bit)","Executable",[""]),
@@ -108,48 +98,32 @@ SIGNATURES = [
     (b"#!",                          0, "Shell Script",        "Script",   [".sh", ".bash"]),
     (b"#!/usr/bin/python",           0, "Python Script",       "Script",   [".py"]),
     (b"\xCA\xFE\xBA\xBE",           0, "Java Class File",     "Executable",[".class"]),
-
-    # ── Audio ────────────────────────────────
     (b"ID3",                         0, "MP3 Audio (ID3 tag)", "Audio",    [".mp3"]),
     (b"\xFF\xFB",                    0, "MP3 Audio",           "Audio",    [".mp3"]),
     (b"fLaC",                        0, "FLAC Audio",          "Audio",    [".flac"]),
     (b"OggS",                        0, "OGG Audio/Video",     "Audio",    [".ogg", ".ogv"]),
     (b"RIFF",                        0, "WAV Audio",           "Audio",    [".wav"]),  # + WAVE at offset 8
     (b"MAC ",                        0, "Monkey's Audio",      "Audio",    [".ape"]),
-
-    # ── Video ────────────────────────────────
     (b"\x00\x00\x00\x14ftyp",       0, "MP4 Video",           "Video",    [".mp4", ".m4v"]),
     (b"\x1aE\xdf\xa3",              0, "Matroska/WebM Video", "Video",    [".mkv", ".webm"]),
     (b"FLV\x01",                    0, "Flash Video",         "Video",    [".flv"]),
     (b"\x30\x26\xB2\x75",          0, "ASF/WMV/WMA",         "Video",    [".asf", ".wmv", ".wma"]),
-
-    # ── Fonts ────────────────────────────────
     (b"wOFF",                        0, "WOFF Font",           "Font",     [".woff"]),
     (b"wOF2",                        0, "WOFF2 Font",          "Font",     [".woff2"]),
     (b"\x00\x01\x00\x00\x00",      0, "TrueType Font",       "Font",     [".ttf"]),
     (b"OTTO",                        0, "OpenType Font (CFF)", "Font",     [".otf"]),
-
-    # ── Databases / Data ─────────────────────
     (b"SQLite format 3\x00",        0, "SQLite Database",     "Database", [".sqlite", ".db"]),
     (b"\x53\x51\x4C",               0, "SQLite (alt sig)",    "Database", [".sqlite"]),
-
-    # ── Disk Images ──────────────────────────
     (b"MBR",                         0, "MBR Disk Image",      "DiskImage",[".img"]),
     (b"\x45\x46\x49\x20\x50\x41\x52\x54", 512, "GPT Disk Image","DiskImage",[".img"]),
-
-    # ── Certificates / Crypto ────────────────
     (b"-----BEGIN ",                 0, "PEM Certificate/Key", "Crypto",   [".pem", ".crt", ".key"]),
     (b"\x30\x82",                    0, "DER Certificate",     "Crypto",   [".der", ".cer"]),
-
-    # ── Source / Text ────────────────────────
     (b"<?xml",                       0, "XML Document",        "Text",     [".xml", ".svg", ".xhtml"]),
     (b"<!DOCTYPE",                   0, "HTML Document",       "Text",     [".html", ".htm"]),
     (b"<html",                       0, "HTML Document",       "Text",     [".html", ".htm"]),
     (b"\xEF\xBB\xBF",               0, "UTF-8 BOM Text",      "Text",     [".txt"]),
     (b"\xFF\xFE",                    0, "UTF-16 LE Text",      "Text",     [".txt"]),
     (b"\xFE\xFF",                    0, "UTF-16 BE Text",      "Text",     [".txt"]),
-
-    # ── Compression Special ──────────────────
     (b"\x28\xB5\x2F\xFD",           0, "Zstandard Archive",   "Archive",  [".zst"]),
     (b"LZ4 ",                        0, "LZ4 Archive",         "Archive",  [".lz4"]),
 ]
@@ -160,9 +134,8 @@ MAX_READ = max(
 ) + 16
 
 
-# ─────────────────────────────────────────────
 # RESULT DATACLASS
-# ─────────────────────────────────────────────
+
 @dataclass
 class FileResult:
     path: str
@@ -183,15 +156,12 @@ class FileResult:
     notes: list
 
 
-# ─────────────────────────────────────────────
-# CORE ANALYZER
-# ─────────────────────────────────────────────
 class FileVerifier:
 
     def __init__(self, hex_rows: int = 16):
         self.hex_rows = hex_rows  # bytes per hex dump row
 
-    # ── Magic Number Detection ─────────────────
+    # Magic Number Detection
     def detect_magic(self, data: bytes) -> Optional[tuple]:
         """
         Scan the signature database against raw bytes.
@@ -206,7 +176,7 @@ class FileVerifier:
                         best = (magic, offset, label, category, exts)
         return best
 
-    # ── Shannon Entropy ───────────────────────
+    # Shannon Entropy
     def shannon_entropy(self, data: bytes) -> float:
         """
         Calculate Shannon entropy (bits per byte).
@@ -233,7 +203,7 @@ class FileVerifier:
         if entropy < 7.2:  return "Compressed data"
         return "Encrypted / random / packed"
 
-    # ── File Hashes ──────────────────────────
+    # File Hashes
     def compute_hashes(self, path: str) -> tuple:
         md5 = hashlib.md5()
         sha = hashlib.sha256()
@@ -243,7 +213,7 @@ class FileVerifier:
                 sha.update(chunk)
         return md5.hexdigest(), sha.hexdigest()
 
-    # ── Hex Dump ─────────────────────────────
+    # Hex Dump
     def hex_dump(self, data: bytes, limit: int = 256) -> str:
         """
         Classic hex dump with offset | hex | ASCII columns.
@@ -259,21 +229,21 @@ class FileVerifier:
             lines.append(f"  {offset_str}  {c(hex_part, Color.CYAN)}  {c(ascii_part, Color.WHITE)}")
         return "\n".join(lines)
 
-    # ── WEBP special check ────────────────────
+    # WEBP special check
     def is_webp(self, data: bytes) -> bool:
         return len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP"
 
     def is_wav(self, data: bytes) -> bool:
         return len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WAVE"
 
-    # ── Main Analysis ─────────────────────────
+    
     def analyze(self, filepath: str) -> FileResult:
         path    = Path(filepath)
         ext     = path.suffix.lower()
         notes   = []
         suspicious = False
 
-        # Read raw bytes
+        
         try:
             with open(filepath, "rb") as f:
                 data = f.read(MAX_READ)
@@ -347,9 +317,9 @@ class FileVerifier:
         )
 
 
-# ─────────────────────────────────────────────
+
 # DISPLAY / REPORT
-# ─────────────────────────────────────────────
+
 def print_banner():
     print(c("""
 ╔══════════════════════════════════════════════════════════════╗
@@ -412,9 +382,8 @@ def export_csv(results: list, outpath: str):
     print(ok(f"✔ CSV report saved  → {outpath}"))
 
 
-# ─────────────────────────────────────────────
 # CLI
-# ─────────────────────────────────────────────
+
 def build_parser():
     p = argparse.ArgumentParser(
         description="File Type Verification Tool — Magic Numbers + Binary Analysis",
@@ -527,7 +496,7 @@ def main():
         print(f"  Categories     :", ", ".join(f"{k}({v})" for k, v in sorted(cats.items())))
         print(f"{'═'*62}")
 
-    # ── Export ───────────────────────────────
+    # Export
     if args.export and results:
         out = args.export
         if out.endswith(".csv"):
